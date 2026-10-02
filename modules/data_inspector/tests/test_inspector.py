@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 import anndata as ad
 import h5py
@@ -279,6 +280,91 @@ class InspectorTests(unittest.TestCase):
             write_reports(report, destination)
         self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep me")
         self.assertFalse((destination / "inspection_report.json").exists())
+
+    def test_report_writer_preserves_files_created_after_collision_check(self) -> None:
+        source = self.root / "race_source.h5ad"
+        make_file(source)
+        before = source_snapshot(source)
+        panel = self.root / "race_panel.txt"
+        panel.write_text("B\nA\n", encoding="utf-8")
+        real_mkdir = Path.mkdir
+        for filename in ("inspection_report.json", "inspection_report.md", "reorder_plan.csv"):
+            with self.subTest(filename=filename):
+                report = inspect_h5ad(source, panel)
+                destination = (self.root / ("race_" + filename)).resolve()
+                collision = destination / filename
+                sentinel = b"report created by another writer"
+                injected = []
+
+                def create_late_file(path, *args, **kwargs):
+                    real_mkdir(path, *args, **kwargs)
+                    if path == destination:
+                        collision.write_bytes(sentinel)
+                        injected.append(True)
+
+                error = None
+                with patch.object(Path, "mkdir", new=create_late_file):
+                    try:
+                        write_reports(report, destination, write_reorder_plan=True)
+                    except FileExistsError as caught:
+                        error = caught
+                self.assertEqual(injected, [True], "The deterministic collision must actually be injected.")
+                self.assertTrue(collision.read_bytes() == sentinel,
+                                "A report artifact created after preflight was overwritten.")
+                self.assertIsInstance(error, FileExistsError)
+                self.assertEqual(source_snapshot(source), before)
+
+    def test_report_writer_refuses_dangling_output_symlinks(self) -> None:
+        source = self.root / "symlink_source.h5ad"
+        make_file(source)
+        before = source_snapshot(source)
+        panel = self.root / "symlink_panel.txt"
+        panel.write_text("B\nA\n", encoding="utf-8")
+        for filename in ("inspection_report.json", "inspection_report.md", "reorder_plan.csv"):
+            with self.subTest(filename=filename):
+                report = inspect_h5ad(source, panel)
+                destination = self.root / ("symlink_" + filename)
+                destination.mkdir()
+                outside = self.root / ("outside_" + filename)
+                output = destination / filename
+                try:
+                    output.symlink_to(outside)
+                except OSError as error:
+                    self.skipTest(f"Symlinks unavailable: {error}")
+                error = None
+                try:
+                    write_reports(report, destination, write_reorder_plan=True)
+                except (ValueError, FileExistsError) as caught:
+                    error = caught
+                self.assertFalse(outside.exists(), "A dangling output link was followed outside the report directory.")
+                self.assertIsNotNone(error)
+                self.assertTrue(output.is_symlink())
+                self.assertEqual(source_snapshot(source), before)
+
+    def test_cli_returns_error_for_late_report_collision(self) -> None:
+        source = self.root / "cli_race_source.h5ad"
+        make_file(source)
+        before = source_snapshot(source)
+        destination = (self.root / "cli_race_reports").resolve()
+        collision = destination / "inspection_report.md"
+        sentinel = b"concurrent Markdown report"
+        real_mkdir = Path.mkdir
+        injected = []
+
+        def create_late_file(path, *args, **kwargs):
+            real_mkdir(path, *args, **kwargs)
+            if path == destination:
+                collision.write_bytes(sentinel)
+                injected.append(True)
+
+        stderr = io.StringIO()
+        with patch.object(Path, "mkdir", new=create_late_file), redirect_stderr(stderr), redirect_stdout(io.StringIO()):
+            code = cli_main([str(source), "--report-dir", str(destination)])
+        self.assertEqual(injected, [True], "The deterministic collision must actually be injected.")
+        self.assertEqual(code, 2)
+        self.assertTrue(collision.read_bytes() == sentinel)
+        self.assertIn("vec-inspect:", stderr.getvalue())
+        self.assertEqual(source_snapshot(source), before)
 
     def test_sparse_statistics_include_implicit_zeros(self) -> None:
         one_value = self.root / "one_value.h5ad"

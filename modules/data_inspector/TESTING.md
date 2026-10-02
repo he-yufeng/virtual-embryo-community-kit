@@ -23,6 +23,7 @@ The unit suite builds temporary synthetic HDF5 files and checks:
 - exact set/different order, missing, extra, and duplicate gene-name cases;
 - a separate reorder-plan CSV;
 - refusal to overwrite existing report artifacts;
+- deterministic late-file collisions after preflight for JSON, Markdown, and reorder CSV, dangling output symlinks, and CLI failure without replacing a concurrent report;
 - absent `celltype`, absent `spatial_3D`, and malformed spatial shape handling.
 - readable malformed `X` dimensions through both API and CLI, plus clean CLI handling of an unreadable input;
 - AnnData-written dense/CSR/CSC fixtures and h5py-crafted corrupt sparse layouts, with bounded CSR/CSC structure validation before numeric QC;

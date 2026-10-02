@@ -707,7 +707,7 @@ def _write_reorder_plan(report: dict[str, Any], output_dir: Path) -> str | None:
     panel = [line.strip() for line in panel_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     lookup = {gene: index for index, gene in enumerate(var_names)}
     destination = output_dir / "reorder_plan.csv"
-    with destination.open("w", newline="", encoding="utf-8") as handle:
+    with destination.open("x", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(["target_panel_position", "gene", "source_var_position"])
         writer.writerows((position, gene, lookup[gene]) for position, gene in enumerate(panel))
@@ -1022,7 +1022,7 @@ def write_reports(report: dict[str, Any], report_dir: str | Path, *, write_reord
     intended = [json_path, markdown_path]
     if write_reorder_plan:
         intended.append(destination / "reorder_plan.csv")
-    collisions = [path for path in intended if path.exists()]
+    collisions = [path for path in intended if path.exists() or path.is_symlink()]
     if collisions:
         names = ", ".join(path.name for path in collisions)
         raise ValueError(f"Refusing to overwrite existing report artifact(s): {names}. Choose a new report directory.")
@@ -1032,8 +1032,12 @@ def write_reports(report: dict[str, Any], report_dir: str | Path, *, write_reord
         if report.get("gene_panel") and reorder:
             report["gene_panel"]["reorder_plan_file"] = reorder
     public_report = {key: value for key, value in report.items() if key != "_internal_var_names"}
-    json_path.write_text(json.dumps(_plain(public_report), indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    markdown_path.write_text(_markdown(public_report), encoding="utf-8")
+    json_text = json.dumps(_plain(public_report), indent=2, sort_keys=True) + "\n"
+    with json_path.open("x", encoding="utf-8") as handle:
+        handle.write(json_text)
+    markdown_text = _markdown(public_report)
+    with markdown_path.open("x", encoding="utf-8") as handle:
+        handle.write(markdown_text)
     results = {"json": json_path, "markdown": markdown_path}
     if write_reorder_plan and (destination / "reorder_plan.csv").exists():
         results["reorder_plan"] = destination / "reorder_plan.csv"
