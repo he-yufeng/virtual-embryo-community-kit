@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add optional `--fail-on-attention`: preserve generated reports, return `1` for
+  existing material attention findings, and retain default `0`/error `2` behavior.
+- Verify the option with seven synthetic HDF5 CLI cases and unchanged input bytes.
+
 ## Closeout G2/G3 — 2026-09-11
 
 - Validate categorical celltype codes/categories before counting; reject malformed rank, dtype, length, and bounds without coercion or repair.

@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .inspector import inspect_h5ad, terminal_summary, write_reports
+from .inspector import _attention_findings, inspect_h5ad, terminal_summary, write_reports
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,6 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--write-reorder-plan", action="store_true", help="Write a source-index reorder plan only when the panel has the same unique genes in a different order")
     parser.add_argument("--chunk-rows", type=int, default=1024, help="Dense/spatial rows per read block (default: 1024)")
     parser.add_argument("--chunk-items", type=int, default=1_000_000, help="Sparse/vector values per read block (default: 1000000)")
+    parser.add_argument(
+        "--fail-on-attention", action="store_true",
+        help="Preserve reports but exit 1 if the reported attention section is nonempty; not a submission-validity check",
+    )
     return parser
 
 
@@ -34,6 +38,9 @@ def main(argv: list[str] | None = None) -> int:
     print("  reports:")
     for label, path in outputs.items():
         print(f"    {label}: {path}")
+    if args.fail_on_attention and _attention_findings(report):
+        print("vec-inspect: attention findings detected; reports preserved. This is not a submission-validity decision.", file=sys.stderr)
+        return 1
     return 0
 
 

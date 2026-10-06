@@ -1,5 +1,13 @@
 # Testing
 
+The optional `--fail-on-attention` CLI path has seven synthetic HDF5 checks in
+`tests/test_cli_attention.py`: clean output with and without the option,
+unchanged default exit `0` for negative values, opt-in exit `1` with reports
+preserved, non-finite and unsupported complex values, axis mismatch, wrong panel
+order, and the existing unreadable-input exit `2`. Every invocation checks that
+the input bytes are unchanged. These checks do not establish board eligibility,
+normalization, or official acceptance.
+
 Run from this directory after installing requirements:
 
 ```bash

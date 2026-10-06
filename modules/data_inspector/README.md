@@ -122,6 +122,20 @@ Complex-valued expression values and spatial coordinates are explicitly declined
 
 ## Malformed-input CLI policy
 
+For an automation pipeline, opt into `--fail-on-attention`:
+
+```bash
+vec-inspect /path/to/file.h5ad --report-dir /path/to/new-report --fail-on-attention
+```
+
+The default behavior below is unchanged. With this flag, generated reports are
+preserved, but the command exits `1` when the same material `attention` findings
+already shown in the terminal/Markdown report are present. An unreadable input
+or report-writing error still exits `2`. Exit `0` with the flag means only that
+the tool reported no attention findings; it does not establish normalization,
+biological quality, board eligibility, or official submission acceptance. It
+must not be used to automatically authorize an upload.
+
 For a readable HDF5 file with a malformed but inspectable layout, `vec-inspect` writes the normal Markdown/JSON report and exits `0`; inspect the terminal `attention` section and report fields marked `invalid` or `not assessed`. **Exit `0` means only that the report was generated, not that the file or any component is valid.** For an unreadable/non-HDF5 input, inaccessible file, invalid command arguments, a mid-run source change, or report-output collision, it prints a concise `vec-inspect:` diagnostic to stderr, writes no new report artifacts, and exits `2`. Expected malformed inputs do not produce a traceback.
 
 ## Read-only behavior
